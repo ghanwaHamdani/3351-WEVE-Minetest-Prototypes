@@ -260,26 +260,125 @@ local function build(origin)
    m:set_string('title',title);m:set_string('info',info)
    m:set_string('infotext',title..' (right-click)')
  end
- -- Wall-mounted signs: room number/category at entry, never floating cubes.
- sign(83,3,30,'sign_foyer','TA.1 — Main Entrance Foyer','EX.1 and EX.2 are separate glazed two-leaf entrances.',4)
- sign(83,3,5,'sign_ta2','TA.2 — Connecting Corridor','TA.2 links the entrance to TA.3 and TA.5.',3)
- sign(79,3,22,'sign_ta3','TA.3 — Connector','Connects TA.2 to the west hall TA.4.',4)
- sign(5,3,12,'sign_ta4','TA.4 — West Hallway','Hall serving Rooms 28, 18 and 14.',5)
- sign(96,3,12,'sign_ta5','TA.5 — East Hallway','Connects TA.2 to Room 40, study cluster and Room 50.',5)
- sign(96,3,9,'sign_40','Room 40 — Classroom','Whiteboard; central aisle; tables and chairs on either side.',5)
- sign(46,3,9,'sign_28','Room 28 — Laboratory','Lab benches face a whiteboard.',5)
- sign(14,3,12,'sign_18','Room 18 — Student Design','Metal workbenches along the room.',4)
- sign(27,3,12,'sign_14','Room 14 — Student Design','Separate design space with metal workbenches.',4)
- sign(102,3,12,'sign_50a','Room 50A — Study','Tables and chairs in a designated study room.',4)
- sign(111,3,12,'sign_50b','Room 50B — Study','Tables and chairs in a designated study room.',4)
- sign(110,3,9,'sign_50d','Room 50D — Study','Tables and chairs in a designated study room.',5)
- sign(121,4,14,'sign_50','Room 50 — Common Area','Large open common space, deliberately left unfurnished.',3)
- -- Five interactive POIs (not extra rooms): lab, class, design, study, common.
- sign(52,2,-9,'poi1','POI 1: Room 28','Laboratory; lab benches aligned toward the north wall whiteboard.',4)
- sign(101,2,-9,'poi2','POI 2: Room 40','Classroom; open center aisle and desks/chairs on both sides.',4)
- sign(34,2,28,'poi3','POI 3: Design Rooms','Room 14 and Room 18 are separate student design studios.',5)
- sign(116,2,22,'poi4','POI 4: Study Cluster','Study spaces include Rooms 50A, 50B and 50D.',5)
- sign(121,3,21,'poi5','POI 5: Room 50','Large open common area on the east end of the main floor.',3)
+-- Wall-mounted room signs with complete architectural and layout descriptions:
+ sign(83,3,30,'sign_foyer','TA.1 — Main Entrance Foyer (EX 1 / EX 2)',
+      'Spatial Layout:\n'..
+      '• Dual-door exterior vestibules (EX 1 and EX 2) with exterior glazing and draft locks.\n'..
+      '• Central concourse featuring limestone pillars, high natural daylighting, and exterior paving.\n'..
+      '• Acts as the primary arterial entry point connecting directly into the central spine (TA.2).',4)
+
+ sign(83,3,5,'sign_ta2','TA.2 — Connecting Corridor & Central Spine',
+      'Spatial Layout:\n'..
+      '• Main circulation spine running south-to-north through the building core.\n'..
+      '• Directly connects the south TA.1 entrance foyer to east/west wings.\n'..
+      '• Features dedicated dual-door bypass access directly into Room 40.',3)
+
+ sign(79,3,22,'sign_ta3','TA.3 — Central Connector',
+      'Spatial Layout:\n'..
+      '• Angled corridor connector funneling foot traffic between spine TA.2 and the west wing TA.4.\n'..
+      '• Provides minimum 3-block clear passage for high-volume student flow.\n'..
+      '• Overhead perimeter illumination grid.',4)
+
+ sign(5,3,12,'sign_ta4','TA.4 — West Instructional Hallway',
+      'Spatial Layout:\n'..
+      '• West academic wing corridor serving technical instructional and design facilities.\n'..
+      '• North side: Direct access doors to instructional Laboratory Room 28.\n'..
+      '• South side: Dual independent entrances to Student Design Studios (Rooms 14 and 18).',5)
+
+ sign(96,3,12,'sign_ta5','TA.5 — East Hallway & Transition',
+      'Spatial Layout:\n'..
+      '• Primary east wing hallway linking spine TA.2 to core teaching and study zones.\n'..
+      '• North access: Classroom 40 and Study Room 50D.\n'..
+      '• South access: Study spaces 50A and 50B.\n'..
+      '• Eastern terminus opens wide into the large common atrium (Room 50).',5)
+
+ sign(96,3,9,'sign_40','Room 40 — Tiered / Modular Classroom',
+      'Spatial Layout:\n'..
+      '• Front North Wall: Wall-to-wall instructional whiteboard array.\n'..
+      '• Center Floor: Wide clear central aisle dividing two columns of student desks and seating.\n'..
+      '• Exterior East/Perimeter: Alternating limestone piers and clear daylight glass fenestration.\n'..
+      '• Entrances: Dual access via TA.5 and private bypass connection from corridor TA.2.',5)
+
+ sign(46,3,9,'sign_28','Room 28 — Instructional Engineering Lab',
+      'Spatial Layout:\n'..
+      '• Layout: 3 continuous rows of heavy laboratory benches arranged along a north-south axis.\n'..
+      '• North Demonstration Wall: Teaching whiteboard with integrated utility raceway clearance.\n'..
+      '• Seating: Ergonomic stools positioned with ample aisle clearance behind each bench.\n'..
+      '• Windows: Exterior limestone pier and clear glazing grid bringing north light into work surfaces.',5)
+
+ sign(14,3,12,'sign_18','Room 18 — Student Design Studio',
+      'Spatial Layout:\n'..
+      '• Perimeter Fabrication: Continuous heavy metal workbenches lining east and west walls.\n'..
+      '• South Wall: Assembly bench dedicated to rapid prototyping, tooling, and team assembly.\n'..
+      '• Interior Flow: Open central work zone permitting large project builds and maneuverability.\n'..
+      '• Access: Double-leaf doors to TA.4 for prototype equipment transport.',4)
+
+ sign(27,3,12,'sign_14','Room 14 — Student Design Studio',
+      'Spatial Layout:\n'..
+      '• Dedicated companion engineering design studio partitioned from Room 18.\n'..
+      '• Perimeter: Heavy steel-frame workbenches equipped for physical prototyping and mockups.\n'..
+      '• Layout: Open-floor layout facilitating team breakout and spatial prototyping.\n'..
+      '• Access: Direct entrance off hallway TA.4.',4)
+
+ sign(102,3,12,'sign_50a','Room 50A — Breakout Study Room',
+      'Spatial Layout:\n'..
+      '• Part of the collaborative study cluster bordering hallway TA.5.\n'..
+      '• Center: Group collaboration study desk equipped with task seating.\n'..
+      '• Enclosure: Sound-dampening interior partition walls for focused group sessions.',4)
+
+ sign(111,3,12,'sign_50b','Room 50B — Breakout Study Room',
+      'Spatial Layout:\n'..
+      '• Middle breakout study room of the 50-series cluster.\n'..
+      '• Center: Team study desk and seating with perimeter access.\n'..
+      '• Corridor Interface: Direct doorway opening to south wall of TA.5.',4)
+
+ sign(110,3,9,'sign_50d','Room 50D — Quiet Study Room',
+      'Spatial Layout:\n'..
+      '• North-facing study room positioned adjacent to Classroom 40.\n'..
+      '• Interior: Centered study table and seating configuration.\n'..
+      '• Windows: Exterior glass pane admitting natural light from the north facade.',5)
+
+ sign(121,4,14,'sign_50','Room 50 — Common Area & Large East Hall',
+      'Spatial Layout:\n'..
+      '• Expansive, double-height open student common area and social atrium.\n'..
+      '• Perimeter: Triple-aspect floor-to-ceiling curtain wall glazing supported by limestone piers.\n'..
+      '• Interior Volume: Kept intentionally open for high-density student congregation and events.\n'..
+      '• Connection: Direct 6-block wide portal leading into east corridor TA.5.',3)
+
+ -- Five designated Interactive POI Stations:
+ sign(52,2,-9,'poi1','[POI 1] Instructional Laboratory (Room 28)',
+      'Room 28 Laboratory Specification:\n'..
+      '• Bench Layout: Multi-row lab stations equipped with surface utility channels.\n'..
+      '• Front Demonstration: North wall whiteboard array for instructor-led presentations.\n'..
+      '• Lighting: Overhead quad-grid luminaire fixtures providing shadow-free work surfaces.\n'..
+      '• Structural Facade: Alternating exterior limestone piers and glazing along north boundary.',4)
+
+ sign(101,2,-9,'poi2','[POI 2] Core Instructional Classroom (Room 40)',
+      'Room 40 Classroom Specification:\n'..
+      '• Orientation: Split seating pods flank a 2-block wide central presentation aisle.\n'..
+      '• Presentation: Full-span instructional board on the north bulkhead.\n'..
+      '• Ingress/Egress: Dual egress paths meeting safety code (access to TA.5 and direct door to TA.2).\n'..
+      '• Daylight: Exterior glazed panels spaced between acoustic limestone pillars.',4)
+
+ sign(34,2,28,'poi3','[POI 3] Engineering Design Studios (Rooms 14 & 18)',
+      'Design & Prototyping Cluster:\n'..
+      '• Function: Dual independent capstone and prototype development workspaces.\n'..
+      '• Furnishings: Heavy perimeter workbenches built for structural mockups and tooling.\n'..
+      '• Spatial Footprint: Generous central clearance for material handling and moving prototypes.\n'..
+      '• Access: Wide door openings directly off corridor TA.4.',5)
+
+ sign(116,2,22,'poi4','[POI 4] Collaborative Study Cluster (50A / 50B / 50D)',
+      'Study Cluster Specification:\n'..
+      '• Concept: High-density acoustic breakout spaces located along hallway TA.5.\n'..
+      '• Furnishings: Independent study tables and chairs in each individual room.\n'..
+      '• Partitioning: Dedicated drywall partitions isolating discussions from hallway traffic.',5)
+
+ sign(121,3,21,'poi5','[POI 5] Main East Commons Atrium (Room 50)',
+      'East Hall Commons Specification:\n'..
+      '• Architecture: 13-block elevated ceiling volume serving as the building eastern anchor.\n'..
+      '• Glazing: 3-sided continuous window walls punctuated by rhythmic exterior stone piers.\n'..
+      '• Circulation: Direct seamless transition into the central spine hallway (TA.5).\n'..
+      '• Program: Multi-purpose flexible gathering space designed for high-capacity circulation.',3)
 end
 local building=false
 mt.register_chatcommand('teb_build',{
