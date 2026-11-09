@@ -133,11 +133,10 @@ local function build(origin)
   fill(26,9,4,28,10,8,'rail')
 
   -- Swapped per feedback: glass wall on SOUTH side of the corridor, rooms NORTH.
-  -- Taller corridor windows scaled to the raised corridor ceiling.
-  fill(34,1,12,98,10,12,'air')
+  fill(34,1,12,98,5,12,'air')
   for x=34,98 do
-    if x%8==0 then fill(x,1,12,x,10,12,'frame')
-    else fill(x,2,12,x,10,12,'glass'); put(x,1,12,'frame') end
+    if x%8==0 then fill(x,1,12,x,5,12,'frame')
+    else fill(x,2,12,x,5,12,'glass'); put(x,1,12,'frame') end
   end
 
   -- Room fronts now on the NORTH side, with the same simple two-door entrances.
@@ -306,7 +305,7 @@ mt.register_chatcommand('aceb_build',{
       local current=mt.get_player_by_name(name)
       if current then
         current:set_pos(plus(origin,-18,2,6))
-        mt.chat_send_player(name,'ACEB generated. Corridor windows have been raised to match the taller corridor ceiling; atrium and exit remain on opposite sides of the raised landing.')
+        mt.chat_send_player(name,'ACEB generated. Corridor roof is level with TA.144; atrium and exit are on opposite sides of the raised landing.')
       end
     end)
     return true,'Loading the corrected ACEB first-floor build.'

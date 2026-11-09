@@ -5,5 +5,5 @@ auth_backend = sqlite3
 backend = sqlite3
 player_backend = sqlite3
 gameid = minetest
-world_name = aceb_test9
+world_name = aceb_test8
 server_announce = false
