@@ -29,6 +29,23 @@ register('board','ACEB board','aceb_board.png')
 register('plant','ACEB plant','aceb_plant.png')
 register('rail','ACEB rail','aceb_metal.png')
 register('stair','ACEB stair','aceb_stair.png')
+
+-- DF-06 fix: walkable ramp pieces. Each node rises 0.5 over four 0.125 sub-steps,
+-- below the player's 0.6-node step height, so the ramp can be walked without jumping.
+-- Both pieces ascend toward +x (east, toward the raised landing).
+local function ramp_boxes(base)
+  local boxes={}
+  for k=0,3 do
+    boxes[#boxes+1]={-0.5+0.25*k,-0.5,-0.5,-0.25+0.25*k,base+0.125*(k+1),0.5}
+  end
+  return boxes
+end
+register('ramp_low','ACEB ramp (lower)','aceb_tile.png',{
+  drawtype='nodebox',paramtype='light',node_box={type='fixed',fixed=ramp_boxes(-0.5)}
+})
+register('ramp_high','ACEB ramp (upper)','aceb_tile.png',{
+  drawtype='nodebox',paramtype='light',node_box={type='fixed',fixed=ramp_boxes(0)}
+})
 register('door','ACEB glass door','aceb_glass.png',{
   drawtype='nodebox',paramtype='light',paramtype2='facedir',sunlight_propagates=true,use_texture_alpha='blend',walkable=false,
   node_box={type='fixed',fixed={-0.45,-0.5,0.42,0.45,0.5,0.5}},
@@ -74,6 +91,24 @@ local AREA={
   atrium={x1=104,x2=150,z1=-40,z2=0,by=4,h=9}
 }
 
+-- Lays the walkable ramp (DF-06 fix) through a setter set(x,y,z,id), in origin-relative
+-- coordinates. It rises from the corridor floor (y=0) to the landing (y=4) over x=96..103,
+-- alternating lower/upper ramp pieces on top of solid floor columns.
+local function lay_ramp(set)
+  for y=1,4 do for x=96,103 do
+    set(x,y,0,'wall')
+    for z=1,5 do set(x,y,z,'air') end
+  end end
+  for i=0,7 do
+    local x=96+i
+    local top=1+math.floor(i/2)
+    for z=1,5 do
+      for y=1,top-1 do set(x,y,z,'floor') end
+      set(x,top,z, i%2==0 and 'ramp_low' or 'ramp_high')
+    end
+  end
+end
+
 local function authorized(name)
   return mt.is_singleplayer() or mt.check_player_privs(name,{server=true})
 end
@@ -86,7 +121,7 @@ local function build(origin)
   local area=VoxelArea:new({MinEdge=emin,MaxEdge=emax})
   local data=vm:get_data()
   local ids={air=mt.get_content_id('air')}
-  for _,id in ipairs({'floor','wall','facade','frame','glass','roof','path','lamp','desk','bench','chair','worktop','computer','board','plant','rail','stair','door'}) do ids[id]=mt.get_content_id(MOD..':'..id) end
+  for _,id in ipairs({'floor','wall','facade','frame','glass','roof','path','lamp','desk','bench','chair','worktop','computer','board','plant','rail','stair','door','ramp_low','ramp_high'}) do ids[id]=mt.get_content_id(MOD..':'..id) end
   local function put(x,y,z,id)
     local p=plus(origin,x,y,z)
     data[area:index(p.x,p.y,p.z)] = ids[id]
@@ -180,12 +215,8 @@ local function build(origin)
     for x=r.x1+3,r.x2-3,6 do fill(x,1,r.z1,x,5,r.z1,'frame') end
   end
 
-  -- Flat incline ramp on the LEFT and 4-step stairs on the RIGHT
-  for step=0,3 do
-    local x1=96 + step*2
-    local x2=x1+1
-    fill(x1,1+step,0,x2,1+step,5,'floor')
-  end
+  -- Walkable ramp on the LEFT (DF-06 fix) and 4-step stairs on the RIGHT
+  lay_ramp(put)
   fill(104,4,0,118,4,5,'floor')
   for step=1,4 do
     local x1=95 + step*2
@@ -302,6 +333,7 @@ mt.register_chatcommand('aceb_build',{
         return
       end
       store:set_string('origin', mt.pos_to_string(origin))
+      store:set_string('ramp_fix','1')
       local current=mt.get_player_by_name(name)
       if current then
         current:set_pos(plus(origin,-18,2,6))
@@ -322,6 +354,38 @@ mt.register_chatcommand('aceb_go',{
     return true,'Teleported to TA.140 / EX.23.'
   end
 })
+-- Re-lays the ramp in a world that was built before the DF-06 fix.
+local function fix_ramp(origin, done)
+  mt.emerge_area(plus(origin,96,1,0), plus(origin,103,4,5), function(_,_,remaining)
+    if remaining ~= 0 then return end
+    lay_ramp(function(x,y,z,id)
+      mt.set_node(plus(origin,x,y,z), {name=(id=='air') and 'air' or MOD..':'..id})
+    end)
+    store:set_string('ramp_fix','1')
+    if done then done() end
+  end)
+end
+
+-- Existing worlds (e.g. the submitted aceb_mod world) are patched once, automatically.
+mt.after(2, function()
+  local origin=mt.string_to_pos(store:get_string('origin'))
+  if origin and store:get_string('ramp_fix') ~= '1' then
+    fix_ramp(origin, function() mt.log('action','['..MOD..'] DF-06 ramp fix applied.') end)
+  end
+end)
+
+mt.register_chatcommand('aceb_fix_ramp',{
+  description='Re-apply the walkable ramp (DF-06 fix) to an existing ACEB build',
+  privs={interact=true},
+  func=function(name)
+    if not authorized(name) then return false,'Available only in singleplayer or to administrators.' end
+    local origin=mt.string_to_pos(store:get_string('origin'))
+    if not origin then return false,'Run /aceb_build first.' end
+    fix_ramp(origin, function() mt.chat_send_player(name,'Ramp fix applied.') end)
+    return true,'Applying ramp fix...'
+  end
+})
+
 mt.register_chatcommand('aceb_info',{
   description='List modeled spaces',
   func=function()
