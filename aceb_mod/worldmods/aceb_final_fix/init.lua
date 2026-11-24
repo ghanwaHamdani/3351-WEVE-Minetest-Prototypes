@@ -36,16 +36,91 @@ register('door','ACEB glass door','aceb_glass.png',{
   groups={cracky=3,oddly_breakable_by_hand=3}
 })
 
-local function show_info(player,title,info)
-  if not player or not player:is_player() then return end
-  mt.show_formspec(player:get_player_name(), MOD..':info',
-    'formspec_version[4]size[10,5]'..
-    'label[0.5,0.5;'..mt.formspec_escape(title)..']'..
-    'textarea[0.5,1.1;9,3.0;text;;'..mt.formspec_escape(info)..']'..
-    'button_exit[4,4.2;2,0.6;close;Close]')
+-- WEVE POI/sign text standard (shared by ACEB, TEB and SEB; see docs/POI_STANDARD.md).
+--   Wall sign title: "<Space ID> — <Space type>"
+--   POI title:       "POI <n> — <Space ID> — <Space type>"
+--   Description:     1-2 sentences: what/where the space is, then what is in it.
+-- All sign text lives in this table, so editing it updates every sign, including
+-- signs in worlds that were built before the change (see the LBM below).
+local BUILDING='ACEB — Amit Chakma Engineering Building'
+local SIGN_TEXT={
+  label_entrance={'TA.140 / EX.23 — Main Entrance',
+    'Main entrance vestibule of the ACEB first floor, with double glass doors. Staircase ST.B is directly ahead as you enter.'},
+  label_stairs={'ST.B — Staircase',
+    'Staircase located directly ahead of the main entrance TA.140 / EX.23.'},
+  label_corridor={'TA.141 — Corridor and Study Space',
+    'Main first-floor corridor connecting the entrance to Rooms 1400, 1420 and 1440. Windows line the corridor, with a long bench and study tables.'},
+  label_1400={'Room 1400 — Computer Lab',
+    'Computer lab off corridor TA.141. A whiteboard faces a centre aisle, with tables and chairs on both sides.'},
+  label_1420={'Room 1420 — Classroom',
+    'Classroom off corridor TA.141. Rows of long tables face the whiteboard.'},
+  label_1440={'Room 1440 — Workshop',
+    'Workshop and design-project space off corridor TA.141. Metal benches serve as workstations.'},
+  label_atrium={'TA.144 — Atrium / Common Space',
+    'Large open atrium on the north side of the raised landing at the end of corridor TA.141. The exit is opposite, on the south side.'},
+  poi1={'POI 1 — Room 1400 — Computer Lab',
+    'Purpose: Computer-based learning and practical work space.\n'..
+    'Student Activities: Students can complete assignments and practice programming.'},
+  poi2={'POI 2 — Room 1420 — Classroom',
+    'Purpose: Teaching environment for lectures and presentations.\n'..
+    'Student Activities: Students can attend lectures and engage in discussions.'},
+  poi3={'POI 3 — Room 1440 — Workshop',
+    'Purpose: A hands-on workspace for engineering design, development, and project activities.\n'..
+    'Student Activities: Students can collaborate on engineering projects.'},
+  poi4={'POI 4 — TA.141 — Study Spaces',
+    'Purpose: Informal study spaces for individual or collaborative learning.\n'..
+    'Student Activities: Students can study, complete coursework, or work on group projects.'},
+  poi5={'POI 5 — TA.144 — Atrium',
+    'Purpose: Common area, often used for club meetings.\n'..
+    'Student Activities: Students can socialize, relax between classes, and participate in informal discussions.'},
+}
+
+-- Hand-placed wooden signs in the saved world (placed in Sprint 1). Each rule
+-- matches the original text and rewrites it to the standard; text that already
+-- matches the standard is left alone, so this is safe to run on every load.
+local WOOD_SIGNS={
+  {'^Room 1400','poi1'}, {'^Room 1420','poi2'}, {'^Room 1440','poi3'},
+  {'^TA%.141','poi4'}, {'^TA%.144','poi5'},
+  {'^EX%.23','EX.23 — Entrance'},
+  {'^ST%.B','ST.B — Stairs to Floor 2'},
+  {'^Path to SEB','Path to SEB — Spencer Engineering Building'},
+  {'^ACEB Digital Twin',BUILDING..' (Digital Twin)'},
+}
+
+-- Where /poi places the player (origin-relative), and the POI sign it should face.
+local POI_STAND={
+  {stand=v(18,1,-10), sign=v(12,2,-6)},
+  {stand=v(53,1,-10), sign=v(47,2,-6)},
+  {stand=v(84,1,-10), sign=v(78,2,-6)},
+  {stand=v(42,1,6),   sign=v(42,2,11)},
+  {stand=v(120,5,-14),sign=v(116,5,-8)},
+}
+
+local function show_info(player,key)
+  local text=SIGN_TEXT[key]
+  if not text or not player or not player:is_player() then return end
+  mt.show_formspec(player:get_player_name(), MOD..':poi_info',
+    'formspec_version[4]size[10,5.2]'..
+    'label[0.5,0.45;'..mt.formspec_escape(BUILDING)..']'..
+    'style_type[label;font=bold]'..
+    'label[0.5,0.95;'..mt.formspec_escape(text[1])..']'..
+    'textarea[0.5,1.4;9,2.8;;;'..mt.formspec_escape(text[2])..']'..
+    'button_exit[4,4.4;2,0.6;close;Close]')
 end
 
+local function key_of(nodename) return nodename:sub(#MOD+2) end
+
+local function apply_text(pos,key)
+  local text=SIGN_TEXT[key]
+  if not text then return end
+  local meta=mt.get_meta(pos)
+  meta:set_string('infotext',text[1]..'\n(right-click for details)')
+  meta:set_string('formspec','')
+end
+
+local SIGN_NODES={}
 local function register_panel(id,desc,texture)
+  SIGN_NODES[#SIGN_NODES+1]=MOD..':'..id
   mt.register_node(MOD..':'..id,{
     description=desc,
     drawtype='signlike',
@@ -54,15 +129,61 @@ local function register_panel(id,desc,texture)
     walkable=false, groups={choppy=2,dig_immediate=2},
     selection_box={type='wallmounted'},
     on_rightclick=function(pos,node,player)
-      local meta=mt.get_meta(pos)
-      show_info(player, meta:get_string('title'), meta:get_string('info'))
+      show_info(player,key_of(node.name))
     end
   })
 end
 for _,id in ipairs({'entrance','stairs','corridor','1400','1420','1440','atrium'}) do
   register_panel('label_'..id, 'ACEB wall sign', 'aceb_label_'..id..'.png')
 end
-register_panel('poi','ACEB POI','aceb_poi.png')
+for n=1,5 do register_panel('poi'..n, 'ACEB POI '..n, 'aceb_poi'..n..'.png') end
+-- Legacy single POI node from worlds built before the standard; converted by the LBM.
+register_panel('poi','ACEB POI (legacy)','aceb_poi.png')
+
+mt.register_lbm({
+  label='Apply WEVE POI/sign text standard',
+  name=MOD..':apply_sign_standard',
+  nodenames=SIGN_NODES,
+  run_at_every_load=true,
+  action=function(pos,node)
+    local key=key_of(node.name)
+    if key=='poi' then
+      local n=tonumber(mt.get_meta(pos):get_string('title'):match('POI (%d)'))
+      if not n then return end
+      key='poi'..n
+      mt.swap_node(pos,{name=MOD..':'..key,param2=node.param2})
+    end
+    apply_text(pos,key)
+  end
+})
+
+local function wood_text(target)
+  local t=SIGN_TEXT[target]
+  return t and (t[1]..'\n'..t[2]) or target
+end
+local WOOD_STANDARD={}
+for _,rule in ipairs(WOOD_SIGNS) do WOOD_STANDARD[wood_text(rule[2])]=true end
+mt.register_lbm({
+  label='Apply WEVE POI/sign text standard to wooden signs',
+  name=MOD..':apply_wood_sign_standard',
+  nodenames={'default:sign_wall_wood'},
+  run_at_every_load=true,
+  action=function(pos)
+    local meta=mt.get_meta(pos)
+    local old=meta:get_string('text')
+    if WOOD_STANDARD[old] then return end
+    for _,rule in ipairs(WOOD_SIGNS) do
+      if old:find(rule[1]) then
+        local new=wood_text(rule[2])
+        meta:set_string('text',new)
+        meta:set_string('infotext',new)
+        meta:set_string('formspec','') -- read-only: visitors cannot overwrite POI text
+        mt.log('action','['..MOD..'] standardized sign at '..mt.pos_to_string(pos))
+        return
+      end
+    end
+  end
+})
 
 local AREA={
   entrance={x1=-12,x2=0,z1=0,z2=12,by=0,h=7},
@@ -251,31 +372,47 @@ local function build(origin)
   setnode(83,1,0,MOD..':door',0); setnode(84,1,0,MOD..':door',0)
   setnode(110,5,12,MOD..':door',2); setnode(111,5,12,MOD..':door',2)
 
-  local function sign(x,y,z,id,title,info,param2)
+  local function sign(x,y,z,id,param2)
     local pos=plus(origin,x,y,z)
     mt.set_node(pos,{name=MOD..':'..id,param2=param2 or 0})
-    local meta=mt.get_meta(pos)
-    meta:set_string('title',title)
-    meta:set_string('info',info)
-    meta:set_string('infotext',title..' (right-click)')
+    apply_text(pos,id)
   end
 
-  -- Wall signs beside rooms / spaces
-  sign(-11,3,3,'label_entrance','TA.140 / EX.23 — ENTRANCE','Main entrance vestibule with double glass doors.',2)
-  sign(16,3,1,'label_stairs','ST.B — STAIRCASE','Staircase located directly ahead as you enter.',5)
-  sign(35,3,1,'label_corridor','TA.141 — CORRIDOR + STUDY','Main corridor with windows, a long bench, and study tables.',5)
-  sign(14,3,1,'label_1400','ROOM 1400 — COMPUTER LAB','Computer lab with whiteboard, centre aisle, and tables with chairs on both sides.',4)
-  sign(49,3,1,'label_1420','ROOM 1420 — CLASSROOM','Classroom with whiteboard and rows of long tables facing the board.',4)
-  sign(80,3,1,'label_1440','ROOM 1440 — WORKSHOP','Workshop / design-project space with metal benches as workstations.',4)
-  sign(120,7,-1,'label_atrium','TA.144 — ATRIUM / COMMON SPACE','Large empty atrium on the north side of the raised landing. The exit is opposite, on the south side.',5)
+  -- Wall signs beside rooms / spaces (text: SIGN_TEXT at the top of this file)
+  sign(-11,3,3,'label_entrance',2)
+  sign(16,3,1,'label_stairs',5)
+  sign(35,3,1,'label_corridor',5)
+  sign(14,3,1,'label_1400',4)
+  sign(49,3,1,'label_1420',4)
+  sign(80,3,1,'label_1440',4)
+  sign(120,7,-1,'label_atrium',5)
 
   -- Exactly 5 POIs
-  sign(12,2,-6,'poi','POI 1 — ROOM 1400','Room 1400 computer lab.',4)
-  sign(47,2,-6,'poi','POI 2 — ROOM 1420','Room 1420 classroom.',4)
-  sign(78,2,-6,'poi','POI 3 — ROOM 1440','Room 1440 workshop.',4)
-  sign(42,2,11,'poi','POI 4 — STUDY SPACES','Bench seating and study tables along the corridor windows.',5)
-  sign(116,5,-8,'poi','POI 5 — TA.144 ATRIUM','Open common area / atrium.',5)
+  sign(12,2,-6,'poi1',4)
+  sign(47,2,-6,'poi2',4)
+  sign(78,2,-6,'poi3',4)
+  sign(42,2,11,'poi4',5)
+  sign(116,5,-8,'poi5',5)
 end
+
+mt.register_chatcommand('poi',{
+  params='<1-5>',
+  description='Teleport to an ACEB POI and show its information.',
+  func=function(name,param)
+    local n=tonumber(param)
+    if not n or n<1 or n>5 then return false,'Usage: /poi <1-5>' end
+    local origin=mt.string_to_pos(store:get_string('origin'))
+    if not origin then return false,'Run /aceb_build first.' end
+    local player=mt.get_player_by_name(name)
+    if not player then return false,'Player missing.' end
+    local p=POI_STAND[n]
+    player:set_pos(plus(origin,p.stand.x,p.stand.y,p.stand.z))
+    player:set_look_horizontal(math.atan2(-(p.sign.x-p.stand.x), p.sign.z-p.stand.z))
+    player:set_look_vertical(0)
+    show_info(player,'poi'..n)
+    return true,SIGN_TEXT['poi'..n][1]
+  end
+})
 
 local creating=false
 mt.register_chatcommand('aceb_build',{
