@@ -41,7 +41,11 @@ the same two lines or a single short description.
 Each mod keeps all sign text in one `SIGN_TEXT` table near the top of its `init.lua`. Edit the
 text there, not in-game. When a world loads:
 
-- hand-placed wooden signs from Sprint 1 are rewritten to the standard text, and
-- standardized signs are made read-only so visitors cannot overwrite them.
+- hand-placed wooden signs from Sprint 1 are rewritten to the standard text,
+- pointing at a sign shows only its title plus "(right-click for details)", because Luanti
+  cuts off long hover text,
+- right-clicking any sign opens the same read-only popup (building name, title, Purpose and
+  Student Activities), and
+- standardized signs cannot be edited by visitors.
 
 ACEB and TEB also have `/poi <1-5>`, which teleports you to a POI and opens its information.

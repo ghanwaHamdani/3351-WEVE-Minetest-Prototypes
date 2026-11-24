@@ -63,12 +63,25 @@
         return t[2] and (t[1] .. "\n" .. t[2]) or t[1]
     end
 
+    -- Standard read-only information popup (same layout as ACEB and TEB).
+    local function info_formspec(title, body)
+        return "formspec_version[4]size[10,5.2]" ..
+            "label[0.5,0.45;" .. minetest.formspec_escape(BUILDING) .. "]" ..
+            "style_type[label;font=bold]" ..
+            "label[0.5,0.95;" .. minetest.formspec_escape(title) .. "]" ..
+            "textarea[0.5,1.4;9,2.8;;;" .. minetest.formspec_escape(body or "") .. "]" ..
+            "button_exit[4,4.4;2,0.6;close;Close]"
+    end
+
+    -- The hover text shows only the title, because Luanti cuts off long hover
+    -- text; right-click opens the popup with the full text. The popup has no
+    -- "text" field, so visitors cannot overwrite the sign.
     local function write_sign(pos, key)
-        local text = sign_text(key)
+        local t = SIGN_TEXT[key]
         local meta = minetest.get_meta(pos)
-        meta:set_string("text", text)
-        meta:set_string("infotext", text)
-        meta:set_string("formspec", "") -- read-only: visitors cannot overwrite POI text
+        meta:set_string("text", sign_text(key))
+        meta:set_string("infotext", t[2] and (t[1] .. "\n(right-click for details)") or t[1])
+        meta:set_string("formspec", info_formspec(t[1], t[2]))
     end
 
     -- Hand-edited wooden signs in the saved world (Sprint 1) -> standard text.
@@ -81,7 +94,7 @@
         {"^TA%.101$", "ta101"}, {"^ST%.1", "st1"}, {"^SEB Digital Twin", "building"},
     }
     local WOOD_STANDARD = {}
-    for key in pairs(SIGN_TEXT) do WOOD_STANDARD[sign_text(key)] = true end
+    for key in pairs(SIGN_TEXT) do WOOD_STANDARD[sign_text(key)] = key end
 
     minetest.register_lbm({
         label = "Apply WEVE POI/sign text standard to wooden signs",
@@ -90,15 +103,13 @@
         run_at_every_load = true,
         action = function(pos)
             local old = minetest.get_meta(pos):get_string("text")
-            if WOOD_STANDARD[old] then return end
-            for _, rule in ipairs(WOOD_SIGNS) do
-                if old:find(rule[1]) then
-                    write_sign(pos, rule[2])
-                    minetest.log("action", "[seb_digital_twin] standardized sign at "
-                        .. minetest.pos_to_string(pos))
-                    return
+            local key = WOOD_STANDARD[old]
+            if not key then
+                for _, rule in ipairs(WOOD_SIGNS) do
+                    if old:find(rule[1]) then key = rule[2]; break end
                 end
             end
+            if key then write_sign(pos, key) end
         end,
     })
 

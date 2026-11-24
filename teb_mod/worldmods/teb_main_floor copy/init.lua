@@ -116,16 +116,20 @@ local POI_STAND={
  {stand=vec(115,1,17), sign=vec(116,2,22)},
  {stand=vec(127,1,21), sign=vec(121,3,21)},
 }
+-- Standard read-only information popup, shared by the custom signs and the
+-- wooden signs so every sign looks the same when right-clicked.
+local function info_formspec(title,body)
+ return 'formspec_version[4]size[10,5.2]'..
+  'label[0.5,0.45;'..mt.formspec_escape(BUILDING)..']'..
+  'style_type[label;font=bold]'..
+  'label[0.5,0.95;'..mt.formspec_escape(title)..']'..
+  'textarea[0.5,1.4;9,2.8;;;'..mt.formspec_escape(body or '')..']'..
+  'button_exit[4,4.4;2,0.6;close;Close]'
+end
 local function detail(player,key)
  local text=SIGN_TEXT[key]
  if not text or not player or not player:is_player() then return end
- mt.show_formspec(player:get_player_name(),MOD..':poi_info',
-  'formspec_version[4]size[10,5.2]'..
-  'label[0.5,0.45;'..mt.formspec_escape(BUILDING)..']'..
-  'style_type[label;font=bold]'..
-  'label[0.5,0.95;'..mt.formspec_escape(text[1])..']'..
-  'textarea[0.5,1.4;9,2.8;;;'..mt.formspec_escape(text[2])..']'..
-  'button_exit[4,4.4;2,0.6;close;Close]')
+ mt.show_formspec(player:get_player_name(),MOD..':poi_info',info_formspec(text[1],text[2]))
 end
 local function key_of(nodename) return nodename:sub(#MOD+2) end
 local function apply_text(pos,key)
@@ -157,12 +161,19 @@ mt.register_lbm({
  nodenames=SIGN_NODES,
  run_at_every_load=true,
  action=function(pos,node) apply_text(pos,key_of(node.name)) end})
-local function wood_text(target)
+-- Wooden signs: the hover text shows only the title, because Luanti cuts off
+-- long hover text; right-click opens the read-only popup with the full text.
+local function wood_parts(target)
  local t=SIGN_TEXT[target]
- return t and (t[1]..'\n'..t[2]) or target
+ if t then return t[1],t[2] end
+ return target,nil
+end
+local function wood_text(target)
+ local title,body=wood_parts(target)
+ return body and (title..'\n'..body) or title
 end
 local WOOD_STANDARD={}
-for _,rule in ipairs(WOOD_SIGNS) do WOOD_STANDARD[wood_text(rule[2])]=true end
+for _,rule in ipairs(WOOD_SIGNS) do WOOD_STANDARD[wood_text(rule[2])]=rule[2] end
 mt.register_lbm({
  label='Apply WEVE POI/sign text standard to wooden signs',
  name=MOD..':apply_wood_sign_standard',
@@ -171,16 +182,18 @@ mt.register_lbm({
  action=function(pos)
    local m=mt.get_meta(pos)
    local old=m:get_string('text')
-   if WOOD_STANDARD[old] then return end
-   for _,rule in ipairs(WOOD_SIGNS) do
-     if old:find(rule[1]) then
-       local new=wood_text(rule[2])
-       m:set_string('text',new);m:set_string('infotext',new)
-       m:set_string('formspec','') -- read-only: visitors cannot overwrite POI text
-       mt.log('action','['..MOD..'] standardized sign at '..mt.pos_to_string(pos))
-       return
+   local target=WOOD_STANDARD[old]
+   if not target then
+     for _,rule in ipairs(WOOD_SIGNS) do
+       if old:find(rule[1]) then target=rule[2]; break end
      end
    end
+   if not target then return end
+   local title,body=wood_parts(target)
+   m:set_string('text',wood_text(target))
+   m:set_string('infotext',body and (title..'\n(right-click for details)') or title)
+   -- Read-only popup: it has no "text" field, so visitors cannot overwrite the sign.
+   m:set_string('formspec',info_formspec(title,body))
  end})
 
 -- Approximate footprints in 1-block units. Directly editable for measured dimensions.
