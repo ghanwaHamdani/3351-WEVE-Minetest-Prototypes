@@ -41,15 +41,102 @@ register_node('door','TEB glazed double-door leaf','teb_glass.png',{
                             {0.39,-0.5,0.405,0.46,0.5,0.50}}},
  selection_box={type='fixed',fixed={-0.5,-0.5,0.35,0.5,0.5,0.5}},
  groups={cracky=3,oddly_breakable_by_hand=3}})
-local function detail(player,title,info)
- if not player or not player:is_player() then return end
- mt.show_formspec(player:get_player_name(),MOD..':detail',
-  'formspec_version[4]size[9.4,4.3]'..
-  'label[0.5,0.55;'..mt.formspec_escape(title)..']'..
-  'textarea[0.5,1.15;8.4,2.3;text;;'..mt.formspec_escape(info)..']'..
-  'button_exit[3.5,3.55;2.4,0.55;close;Close]')
+-- WEVE POI/sign text standard (shared by ACEB, TEB and SEB; see docs/POI_STANDARD.md).
+--   Wall sign title: "<Space ID> — <Space type>"
+--   POI title:       "POI <n> — <Space ID> — <Space type>"
+--   Description:     1-2 sentences: what/where the space is, then what is in it.
+-- All sign text lives in this table, so editing it updates every sign, including
+-- signs in worlds that were built before the change (see the LBM below).
+local BUILDING='TEB — Thompson Engineering Building'
+local SIGN_TEXT={
+ sign_foyer={'TA.1 — Main Entrance Foyer',
+  'Main entrance foyer of the TEB main floor. EX.1 and EX.2 are separate glazed double-door entrances.'},
+ sign_ta2={'TA.2 — Connecting Corridor',
+  'Corridor linking the entrance foyer TA.1 to connector TA.3 and east hallway TA.5.'},
+ sign_ta3={'TA.3 — Connector',
+  'Connector between corridor TA.2 and west hallway TA.4.'},
+ sign_ta4={'TA.4 — West Hallway',
+  'West hallway serving Rooms 28, 18 and 14.'},
+ sign_ta5={'TA.5 — East Hallway',
+  'East hallway connecting TA.2 to Room 40, study rooms 50A, 50B and 50D, and Room 50.'},
+ sign_40={'Room 40 — Classroom',
+  'Classroom with a whiteboard at the front, a centre aisle, and tables and chairs on either side.'},
+ sign_28={'Room 28 — Laboratory',
+  'Laboratory off west hallway TA.4. Lab benches face a whiteboard.'},
+ sign_18={'Room 18 — Design Studio',
+  'Purpose: Design and project space where students work on engineering designs.\n'..
+  'Student Activities: Students can collaborate on design projects and develop concepts.'},
+ sign_14={'Room 14 — Design Studio',
+  'Purpose: Design and project space where students work on engineering designs.\n'..
+  'Student Activities: Students can collaborate on design projects and develop concepts.'},
+ sign_50a={'Room 50A — Study Room',
+  'Purpose: Dedicated study space supporting individual and collaborative learning.\n'..
+  'Student Activities: Students can review course material, complete assignments, and work on group projects.'},
+ sign_50b={'Room 50B — Study Room',
+  'Purpose: Dedicated study space supporting individual and collaborative learning.\n'..
+  'Student Activities: Students can review course material, complete assignments, and work on group projects.'},
+ sign_50d={'Room 50D — Study Room',
+  'Purpose: Dedicated study space supporting individual and collaborative learning.\n'..
+  'Student Activities: Students can review course material, complete assignments, and work on group projects.'},
+ sign_50={'Room 50 — Common Area',
+  'Large open common space at the east end of the main floor. It is deliberately left unfurnished.'},
+ poi1={'POI 1 — Room 28 — Laboratory',
+  'Purpose: Designed for practical engineering learning and technical activities.\n'..
+  'Student Activities: Students can conduct practical exercises, observe demonstrations, and apply engineering concepts.'},
+ poi2={'POI 2 — Room 40 — Classroom',
+  'Purpose: Classroom for engineering instruction and collaborative learning.\n'..
+  'Student Activities: Students can attend lectures, engage in discussions, and complete classroom activities.'},
+ poi3={'POI 3 — Room 14 — Design Studio',
+  'Purpose: Design and project space where students work on engineering designs.\n'..
+  'Student Activities: Students can collaborate on design projects and develop concepts.'},
+ poi4={'POI 4 — Room 50B — Study Room',
+  'Purpose: Dedicated study space supporting individual and collaborative learning.\n'..
+  'Student Activities: Students can review course material, complete assignments, and work on group projects.'},
+ poi5={'POI 5 — Room 50 — Common Area',
+  'Purpose: Open common area for informal gatherings and student interaction.\n'..
+  'Student Activities: Students can take breaks between classes and engage in informal discussions.'},
+}
+-- Hand-placed wooden signs in the saved world (placed in Sprint 1). Each rule
+-- matches the original text and rewrites it to the standard; text that already
+-- matches the standard is left alone, so this is safe to run on every load.
+-- Room 40 has two signs (one at its TA.2 door, one at its TA.5 door); both are POI 2.
+local WOOD_SIGNS={
+ {'^Room 28','poi1'}, {'^Room 40','poi2'}, {'^Room 14','poi3'},
+ {'^Room 50B','poi4'}, {'^Room 50 ','poi5'},
+ {'^Room 18','sign_18'}, {'^Room 50A','sign_50a'}, {'^Room 50D','sign_50d'},
+ {'^Main Entrance','TA.1 — Main Entrance'},
+ {'^TEB Digital Twin',BUILDING..' (Digital Twin)'},
+}
+-- Where /poi places the player and the POI sign it should face (same
+-- unmirrored coordinates as the sign() calls in build()).
+local POI_STAND={
+ {stand=vec(52,1,-4),  sign=vec(52,2,-9)},
+ {stand=vec(101,1,-4), sign=vec(101,2,-9)},
+ {stand=vec(34,1,22),  sign=vec(34,2,28)},
+ {stand=vec(115,1,17), sign=vec(116,2,22)},
+ {stand=vec(127,1,21), sign=vec(121,3,21)},
+}
+local function detail(player,key)
+ local text=SIGN_TEXT[key]
+ if not text or not player or not player:is_player() then return end
+ mt.show_formspec(player:get_player_name(),MOD..':poi_info',
+  'formspec_version[4]size[10,5.2]'..
+  'label[0.5,0.45;'..mt.formspec_escape(BUILDING)..']'..
+  'style_type[label;font=bold]'..
+  'label[0.5,0.95;'..mt.formspec_escape(text[1])..']'..
+  'textarea[0.5,1.4;9,2.8;;;'..mt.formspec_escape(text[2])..']'..
+  'button_exit[4,4.4;2,0.6;close;Close]')
 end
+local function key_of(nodename) return nodename:sub(#MOD+2) end
+local function apply_text(pos,key)
+ local text=SIGN_TEXT[key]
+ if not text then return end
+ local m=mt.get_meta(pos)
+ m:set_string('infotext',text[1]..'\n(right-click for details)')
+end
+local SIGN_NODES={}
 local function panel(id,texture)
+ SIGN_NODES[#SIGN_NODES+1]=MOD..':'..id
  mt.register_node(MOD..':'..id,{
    description='TEB wall-mounted information sign',drawtype='signlike',tiles={texture},
    inventory_image=texture,wield_image=texture,
@@ -57,14 +144,44 @@ local function panel(id,texture)
    walkable=false,groups={choppy=2,dig_immediate=2},
    selection_box={type='wallmounted'},
    on_rightclick=function(pos,node,clicker)
-     local m=mt.get_meta(pos)
-     detail(clicker,m:get_string('title'),m:get_string('info'))
+     detail(clicker,key_of(node.name))
    end})
 end
 for _,id in ipairs({'foyer','ta2','ta3','ta4','ta5','40','28','14','18','50a','50b','50d','50'}) do
  panel('sign_'..id,'teb_sign_'..id..'.png')
 end
 for i=1,5 do panel('poi'..i,'teb_poi'..i..'.png') end
+mt.register_lbm({
+ label='Apply WEVE POI/sign text standard',
+ name=MOD..':apply_sign_standard',
+ nodenames=SIGN_NODES,
+ run_at_every_load=true,
+ action=function(pos,node) apply_text(pos,key_of(node.name)) end})
+local function wood_text(target)
+ local t=SIGN_TEXT[target]
+ return t and (t[1]..'\n'..t[2]) or target
+end
+local WOOD_STANDARD={}
+for _,rule in ipairs(WOOD_SIGNS) do WOOD_STANDARD[wood_text(rule[2])]=true end
+mt.register_lbm({
+ label='Apply WEVE POI/sign text standard to wooden signs',
+ name=MOD..':apply_wood_sign_standard',
+ nodenames={'default:sign_wall_wood'},
+ run_at_every_load=true,
+ action=function(pos)
+   local m=mt.get_meta(pos)
+   local old=m:get_string('text')
+   if WOOD_STANDARD[old] then return end
+   for _,rule in ipairs(WOOD_SIGNS) do
+     if old:find(rule[1]) then
+       local new=wood_text(rule[2])
+       m:set_string('text',new);m:set_string('infotext',new)
+       m:set_string('formspec','') -- read-only: visitors cannot overwrite POI text
+       mt.log('action','['..MOD..'] standardized sign at '..mt.pos_to_string(pos))
+       return
+     end
+   end
+ end})
 
 -- Approximate footprints in 1-block units. Directly editable for measured dimensions.
 local R={
@@ -252,35 +369,53 @@ local function build(origin)
  {94,1,1},{94,2,1}}) do
    orient_door(entry[1],entry[2],entry[3])
  end
- local function sign(x,y,z,id,title,info,mount)
+ local function sign(x,y,z,id,mount)
    local p=add(origin,163-x,y,z)
    local facing=(mount==2 and 3) or (mount==3 and 2) or mount or 4
    mt.set_node(p,{name=MOD..':'..id,param2=facing})
-   local m=mt.get_meta(p)
-   m:set_string('title',title);m:set_string('info',info)
-   m:set_string('infotext',title..' (right-click)')
+   apply_text(p,id)
  end
- -- Wall-mounted signs: room number/category at entry, never floating cubes.
- sign(83,3,30,'sign_foyer','TA.1 — Main Entrance Foyer','EX.1 and EX.2 are separate glazed two-leaf entrances.',4)
- sign(83,3,5,'sign_ta2','TA.2 — Connecting Corridor','TA.2 links the entrance to TA.3 and TA.5.',3)
- sign(79,3,22,'sign_ta3','TA.3 — Connector','Connects TA.2 to the west hall TA.4.',4)
- sign(5,3,12,'sign_ta4','TA.4 — West Hallway','Hall serving Rooms 28, 18 and 14.',5)
- sign(96,3,12,'sign_ta5','TA.5 — East Hallway','Connects TA.2 to Room 40, study cluster and Room 50.',5)
- sign(96,3,9,'sign_40','Room 40 — Classroom','Whiteboard; central aisle; tables and chairs on either side.',5)
- sign(46,3,9,'sign_28','Room 28 — Laboratory','Lab benches face a whiteboard.',5)
- sign(14,3,12,'sign_18','Room 18 — Student Design','Metal workbenches along the room.',4)
- sign(27,3,12,'sign_14','Room 14 — Student Design','Separate design space with metal workbenches.',4)
- sign(102,3,12,'sign_50a','Room 50A — Study','Tables and chairs in a designated study room.',4)
- sign(111,3,12,'sign_50b','Room 50B — Study','Tables and chairs in a designated study room.',4)
- sign(110,3,9,'sign_50d','Room 50D — Study','Tables and chairs in a designated study room.',5)
- sign(121,4,14,'sign_50','Room 50 — Common Area','Large open common space, deliberately left unfurnished.',3)
+ -- Wall-mounted signs: room number/category at entry (text: SIGN_TEXT above).
+ sign(83,3,30,'sign_foyer',4)
+ sign(83,3,5,'sign_ta2',3)
+ sign(79,3,22,'sign_ta3',4)
+ sign(5,3,12,'sign_ta4',5)
+ sign(96,3,12,'sign_ta5',5)
+ sign(96,3,9,'sign_40',5)
+ sign(46,3,9,'sign_28',5)
+ sign(14,3,12,'sign_18',4)
+ sign(27,3,12,'sign_14',4)
+ sign(102,3,12,'sign_50a',4)
+ sign(111,3,12,'sign_50b',4)
+ sign(110,3,9,'sign_50d',5)
+ sign(121,4,14,'sign_50',3)
  -- Five interactive POIs (not extra rooms): lab, class, design, study, common.
- sign(52,2,-9,'poi1','POI 1: Room 28','Laboratory; lab benches aligned toward the north wall whiteboard.',4)
- sign(101,2,-9,'poi2','POI 2: Room 40','Classroom; open center aisle and desks/chairs on both sides.',4)
- sign(34,2,28,'poi3','POI 3: Design Rooms','Room 14 and Room 18 are separate student design studios.',5)
- sign(116,2,22,'poi4','POI 4: Study Cluster','Study spaces include Rooms 50A, 50B and 50D.',5)
- sign(121,3,21,'poi5','POI 5: Room 50','Large open common area on the east end of the main floor.',3)
+ sign(52,2,-9,'poi1',4)
+ sign(101,2,-9,'poi2',4)
+ sign(34,2,28,'poi3',5)
+ sign(116,2,22,'poi4',5)
+ sign(121,3,21,'poi5',3)
 end
+mt.register_chatcommand('poi',{
+ params='<1-5>',
+ description='Teleport to a TEB POI and show its information.',
+ func=function(name,param)
+   local n=tonumber(param)
+   if not n or n<1 or n>5 then return false,'Usage: /poi <1-5>' end
+   local origin=mt.string_to_pos(store:get_string('origin'))
+   if not origin then return false,'Run /teb_build first.' end
+   local player=mt.get_player_by_name(name)
+   if not player then return false,'Player unavailable.' end
+   local p=POI_STAND[n]
+   -- build() mirrors x as 163-x, so mirror both points the same way.
+   local sx,gx=163-p.stand.x,163-p.sign.x
+   player:set_pos(add(origin,sx,p.stand.y,p.stand.z))
+   player:set_look_horizontal(math.atan2(-(gx-sx),p.sign.z-p.stand.z))
+   player:set_look_vertical(0)
+   detail(player,'poi'..n)
+   return true,SIGN_TEXT['poi'..n][1]
+ end
+})
 local building=false
 mt.register_chatcommand('teb_build',{
  description='Generate only the specified TEB main-floor spaces (clears area).',
