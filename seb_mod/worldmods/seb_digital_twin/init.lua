@@ -26,6 +26,105 @@
         and "default:sign_wall"
         or "default:sign_wall_wood"
 
+    -- WEVE POI/sign text standard (shared by ACEB, TEB and SEB; see docs/POI_STANDARD.md).
+    --   Wall sign title: "<Space ID> — <Space type>"
+    --   POI title:       "POI <n> — <Space ID> — <Space type>"
+    --   POI body:        "Purpose: ..." and "Student Activities: ..." lines.
+    local BUILDING = "SEB — Spencer Engineering Building"
+    local SIGN_TEXT = {
+        poi1 = {"POI 1 — Room 1059 — Classroom",
+            "Purpose: Teaching environment for learning and lectures.\n" ..
+            "Student Activities: Students can attend lectures and participate in discussions."},
+        poi2 = {"POI 2 — Room 1001 — UES Study Area",
+            "Purpose: Student interaction and recreational activities.\n" ..
+            "Student Activities: Students can socialize, relax, or connect with peers."},
+        poi3 = {"POI 3 — Room 1077A — Research Lab (Restricted)",
+            "Purpose: Dedicated space for engineering research, experimentation, and technical investigations.\n" ..
+            "Student Activities: Authorized researchers and students may conduct experiments."},
+        poi4 = {"POI 4 — TA.101 — Hallway",
+            "Purpose: Connects access to approved spaces, separating them from restricted labs.\n" ..
+            "Student Activities: Students can move between the entrance, stairs ST.1 and the approved spaces beyond."},
+        poi5 = {"POI 5 — TA.106 — Foyer",
+            "Purpose: Foyer connecting hallway TA.105 to Classroom 1059 and UES Study Area 1001.\n" ..
+            "Student Activities: Students can gather before classes and move between the classroom and study area."},
+        lab_1077 = {"Room 1077 — Lab (Restricted)"},
+        lab_1079 = {"Room 1079 — Lab (Restricted)"},
+        lab_1061 = {"Room 1061 — Lab (Restricted)"},
+        ex2 = {"EX.2 — Exit"},
+        st1 = {"ST.1 — Stairs to Floor 2"},
+        ta101 = {"TA.101 — Hallway"},
+        ta103 = {"TA.103 — Hallway"},
+        ta105 = {"TA.105 — Hallway"},
+        building = {BUILDING .. " (Digital Twin)"},
+    }
+
+    local function sign_text(key)
+        local t = SIGN_TEXT[key]
+        return t[2] and (t[1] .. "\n" .. t[2]) or t[1]
+    end
+
+    local function write_sign(pos, key)
+        local text = sign_text(key)
+        local meta = minetest.get_meta(pos)
+        meta:set_string("text", text)
+        meta:set_string("infotext", text)
+        meta:set_string("formspec", "") -- read-only: visitors cannot overwrite POI text
+    end
+
+    -- Hand-edited wooden signs in the saved world (Sprint 1) -> standard text.
+    -- Text that already matches the standard is left alone, so the LBM is safe
+    -- to run on every load.
+    local WOOD_SIGNS = {
+        {"^Room 1059", "poi1"}, {"^UES Study Area 1001", "poi2"},
+        {"^1077A", "poi3"}, {"^Hallway", "poi4"},
+        {"^1077 ", "lab_1077"}, {"^1079", "lab_1079"}, {"^1061", "lab_1061"},
+        {"^TA%.101$", "ta101"}, {"^ST%.1", "st1"}, {"^SEB Digital Twin", "building"},
+    }
+    local WOOD_STANDARD = {}
+    for key in pairs(SIGN_TEXT) do WOOD_STANDARD[sign_text(key)] = true end
+
+    minetest.register_lbm({
+        label = "Apply WEVE POI/sign text standard to wooden signs",
+        name = "seb_digital_twin:apply_wood_sign_standard",
+        nodenames = {"default:sign_wall_wood"},
+        run_at_every_load = true,
+        action = function(pos)
+            local old = minetest.get_meta(pos):get_string("text")
+            if WOOD_STANDARD[old] then return end
+            for _, rule in ipairs(WOOD_SIGNS) do
+                if old:find(rule[1]) then
+                    write_sign(pos, rule[2])
+                    minetest.log("action", "[seb_digital_twin] standardized sign at "
+                        .. minetest.pos_to_string(pos))
+                    return
+                end
+            end
+        end,
+    })
+
+    -- The saved Sprint 1 world has no TA.106 sign (its TA.105/TA.106 wall was
+    -- opened up), so POI 5 is placed once, inside the foyer beside the entrance.
+    -- Guarded by the Room 1061 sign position so it only runs in that world.
+    local storage = minetest.get_mod_storage()
+    minetest.register_on_mods_loaded(function()
+        minetest.after(0, function()
+            if storage:get_string("poi5_placed") ~= "" then return end
+            local guard, target = {x = 59, y = 9, z = 160}, {x = 90, y = 9, z = 161}
+            minetest.load_area(guard, target)
+            if minetest.get_node(guard).name ~= "default:sign_wall_wood"
+                    or minetest.get_node(target).name ~= "air"
+                    or minetest.get_node({x = 89, y = 9, z = 161}).name == "air" then
+                return
+            end
+            minetest.set_node(target, {name = "default:sign_wall_wood",
+                param2 = minetest.dir_to_wallmounted({x = -1, y = 0, z = 0})})
+            write_sign(target, "poi5")
+            storage:set_string("poi5_placed", minetest.pos_to_string(target))
+            minetest.log("action", "[seb_digital_twin] placed POI 5 sign at "
+                .. minetest.pos_to_string(target))
+        end)
+    end)
+
     -- doors:door_wood is the requested wooden-door item.  Its direct-place
     -- node variants are required because this generator intentionally uses
     -- minetest.set_node rather than an item-placement callback.
@@ -268,18 +367,20 @@
 
         -- Wall-mounted signs: each text is written through node metadata after
         -- minetest.set_node has placed the physical sign.
-        add_sign(actions, ctx, 1, 2, {x = 1, z = 0}, "EX.2 - Exit")
-        add_sign(actions, ctx, 1, 4, {x = 0, z = 1}, "ST.1 - Stairs")
-        add_sign(actions, ctx, 1, 9, {x = 1, z = 0}, "TA.101")
-        add_sign(actions, ctx, 5, 10, {x = 1, z = 0}, "1077A")
-        add_sign(actions, ctx, 5, 18, {x = 1, z = 0}, "1077")
-        add_sign(actions, ctx, 5, 26, {x = 1, z = 0}, "1079")
-        add_sign(actions, ctx, 5, 32, {x = 1, z = 0}, "1061")
-        add_sign(actions, ctx, 3, 33, {x = -1, z = 0}, "TA.103")
-        add_sign(actions, ctx, -8, 33, {x = -1, z = 0}, "TA.105")
-        add_sign(actions, ctx, -24, 33, {x = -1, z = 0}, "TA.106 - Foyer")
-        add_sign(actions, ctx, -31, 41, {x = 0, z = 1}, "Classroom 1059")
-        add_sign(actions, ctx, -31, 27, {x = 0, z = -1}, "UES Study Area 1001")
+        -- Text keys refer to SIGN_TEXT at the top of this file.
+        add_sign(actions, ctx, 1, 2, {x = 1, z = 0}, "ex2")
+        add_sign(actions, ctx, 1, 4, {x = 0, z = 1}, "st1")
+        add_sign(actions, ctx, 1, 9, {x = 1, z = 0}, "ta101")
+        add_sign(actions, ctx, 5, 10, {x = 1, z = 0}, "poi3")
+        add_sign(actions, ctx, 5, 18, {x = 1, z = 0}, "lab_1077")
+        add_sign(actions, ctx, 5, 26, {x = 1, z = 0}, "lab_1079")
+        add_sign(actions, ctx, 5, 32, {x = 1, z = 0}, "lab_1061")
+        add_sign(actions, ctx, 3, 32, {x = -1, z = 0}, "poi4")
+        add_sign(actions, ctx, 3, 33, {x = -1, z = 0}, "ta103")
+        add_sign(actions, ctx, -8, 33, {x = -1, z = 0}, "ta105")
+        add_sign(actions, ctx, -24, 33, {x = -1, z = 0}, "poi5")
+        add_sign(actions, ctx, -31, 41, {x = 0, z = 1}, "poi1")
+        add_sign(actions, ctx, -31, 27, {x = 0, z = -1}, "poi2")
 
         for _, space in ipairs(SPACES) do
             add_lamps(actions, ctx, space)
@@ -309,10 +410,7 @@
 
         if action.kind == "sign" then
             minetest.set_node(action.pos, {name = SIGN_NODE, param2 = action.param2})
-            local meta = minetest.get_meta(action.pos)
-            meta:set_string("formspec", "field[text;;${text}]")
-            meta:set_string("text", action.text)
-            meta:set_string("infotext", action.text)
+            write_sign(action.pos, action.text)
         end
     end
 
